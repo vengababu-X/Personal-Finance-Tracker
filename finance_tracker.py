@@ -1,293 +1,189 @@
-"""
-Personal Finance Tracker - Intermediate Project
-
-Features:
-- Add expenses (date, category, description, amount)
-- Save all expenses to a CSV file (expenses.csv)
-- View all expenses
-- View monthly summary (by year & month) with total per category + grand total
-- Export monthly summary to a separate CSV file (report_YYYY_MM.csv)
-- Basic error handling for file operations and user input
-
-Concepts used:
-- File handling (txt/csv)
-- csv module
-- Error handling (try/except)
-- Functions and clean code structure
-"""
-
+import tkinter as tk
+from tkinter import ttk, messagebox
 import csv
-import os
 from datetime import datetime
+import os
 
-EXPENSES_FILE = "expenses.csv"
+FILE_NAME = "expenses.csv"
 
-
-# ------------- Utility Functions ------------- #
-
+# ---------- File Setup ----------
 def ensure_file_exists():
-    """
-    Make sure the main CSV file exists and has a header row.
-    """
-    if not os.path.exists(EXPENSES_FILE):
-        try:
-            with open(EXPENSES_FILE, mode="w", newline="", encoding="utf-8") as f:
-                writer = csv.writer(f)
-                # Header row
-                writer.writerow(["date", "category", "description", "amount"])
-        except IOError:
-            print("❌ Error: Could not create expenses file.")
-
-
-def parse_date(date_str):
-    """
-    Parse date string in format YYYY-MM-DD.
-    If invalid, raise ValueError.
-    """
-    return datetime.strptime(date_str, "%Y-%m-%d")
-
-
-def get_valid_date(prompt):
-    """
-    Keep asking until user gives a valid date in YYYY-MM-DD format.
-    """
-    while True:
-        date_str = input(prompt).strip()
-        if not date_str:
-            # default: today
-            return datetime.today()
-        try:
-            return parse_date(date_str)
-        except ValueError:
-            print("Invalid date format. Please use YYYY-MM-DD (or press Enter for today).")
-
-
-def get_valid_float(prompt):
-    """
-    Get a valid float from user; keep asking until valid.
-    """
-    while True:
-        value = input(prompt).strip()
-        try:
-            amount = float(value)
-            if amount <= 0:
-                print("Amount must be positive.")
-                continue
-            return amount
-        except ValueError:
-            print("Invalid amount. Please enter a number.")
-
-
-def get_non_empty_input(prompt):
-    """
-    Input that cannot be empty.
-    """
-    while True:
-        text = input(prompt).strip()
-        if text:
-            return text
-        print("Input cannot be empty.")
-
-
-# ------------- Core Finance Functions ------------- #
-
-def add_expense():
-    """
-    Add a new expense and append it to the CSV file.
-    """
-    print("\n--- Add New Expense ---")
-    date_obj = get_valid_date("Enter date (YYYY-MM-DD) or press Enter for today: ")
-    category = get_non_empty_input("Enter category (e.g., Food, Travel, Shopping): ")
-    description = input("Enter description (optional): ").strip()
-    amount = get_valid_float("Enter amount: ")
-
-    row = [
-        date_obj.strftime("%Y-%m-%d"),
-        category,
-        description,
-        f"{amount:.2f}"
-    ]
-
-    try:
-        with open(EXPENSES_FILE, mode="a", newline="", encoding="utf-8") as f:
+    if not os.path.exists(FILE_NAME):
+        with open(FILE_NAME, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
-            writer.writerow(row)
-        print("✅ Expense added successfully.")
-    except IOError:
-        print("❌ Error: Could not write to expenses file.")
+            writer.writerow(["date", "category", "description", "amount"])
 
+# ---------- Add Expense ----------
+def add_expense(date, category, description, amount):
+    with open(FILE_NAME, "a", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow([date, category, description, amount])
 
-def read_all_expenses():
-    """
-    Read all expenses from the CSV file.
-    Returns a list of dicts: [{"date": ..., "category": ..., ...}, ...]
-    """
+# ---------- Read All Expenses ----------
+def read_expenses():
     expenses = []
-    if not os.path.exists(EXPENSES_FILE):
-        print("No expenses file found yet.")
-        return expenses
-
-    try:
-        with open(EXPENSES_FILE, mode="r", newline="", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                expenses.append(row)
-    except IOError:
-        print("❌ Error: Could not read expenses file.")
+    with open(FILE_NAME, newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            expenses.append(row)
     return expenses
 
+# ---------- GUI App ----------
+class FinanceTrackerApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Personal Finance Tracker")
+        self.root.geometry("700x550")
+        self.root.resizable(False, False)
 
-def view_all_expenses():
-    """
-    Print all expenses in a readable format.
-    """
-    print("\n--- All Expenses ---")
-    expenses = read_all_expenses()
-    if not expenses:
-        print("No expenses recorded yet.")
-        return
+        ensure_file_exists()
+        self.build_ui()
+        self.load_expenses()
 
-    for idx, exp in enumerate(expenses, start=1):
-        print(
-            f"{idx}. Date: {exp['date']}, "
-            f"Category: {exp['category']}, "
-            f"Description: {exp['description']}, "
-            f"Amount: ₹{exp['amount']}"
-        )
+    # ---------- UI ----------
+    def build_ui(self):
+        tk.Label(self.root, text="Personal Finance Tracker",
+                 font=("Arial", 16, "bold")).pack(pady=10)
 
+        form = tk.Frame(self.root)
+        form.pack(pady=5)
 
-def get_monthly_expenses(year, month):
-    """
-    Filter all expenses that match the given year and month.
-    year: int, month: int
-    Returns a list of expense dicts.
-    """
-    expenses = read_all_expenses()
-    monthly = []
-    for exp in expenses:
+        tk.Label(form, text="Date (YYYY-MM-DD)").grid(row=0, column=0)
+        tk.Label(form, text="Category").grid(row=0, column=1)
+        tk.Label(form, text="Description").grid(row=0, column=2)
+        tk.Label(form, text="Amount").grid(row=0, column=3)
+
+        self.date_entry = tk.Entry(form, width=12)
+        self.category_entry = tk.Entry(form, width=12)
+        self.desc_entry = tk.Entry(form, width=20)
+        self.amount_entry = tk.Entry(form, width=10)
+
+        self.date_entry.grid(row=1, column=0, padx=5)
+        self.category_entry.grid(row=1, column=1, padx=5)
+        self.desc_entry.grid(row=1, column=2, padx=5)
+        self.amount_entry.grid(row=1, column=3, padx=5)
+
+        tk.Button(form, text="Add Expense",
+                  command=self.add_expense_ui).grid(row=1, column=4, padx=5)
+
+        # Table
+        columns = ("date", "category", "description", "amount")
+        self.tree = ttk.Treeview(self.root, columns=columns, show="headings", height=12)
+
+        for col in columns:
+            self.tree.heading(col, text=col.capitalize())
+            self.tree.column(col, width=150)
+
+        self.tree.pack(pady=10)
+
+        # Report buttons
+        btn_frame = tk.Frame(self.root)
+        btn_frame.pack(pady=10)
+
+        tk.Button(btn_frame, text="Monthly Report",
+                  command=self.monthly_report).grid(row=0, column=0, padx=10)
+
+        tk.Button(btn_frame, text="Export Monthly CSV",
+                  command=self.export_monthly_report).grid(row=0, column=1, padx=10)
+
+    # ---------- Load Expenses ----------
+    def load_expenses(self):
+        for row in self.tree.get_children():
+            self.tree.delete(row)
+
+        for exp in read_expenses():
+            self.tree.insert("", "end",
+                             values=(exp["date"], exp["category"],
+                                     exp["description"], exp["amount"]))
+
+    # ---------- Add Expense UI ----------
+    def add_expense_ui(self):
+        date = self.date_entry.get().strip()
+        category = self.category_entry.get().strip()
+        desc = self.desc_entry.get().strip()
+        amount = self.amount_entry.get().strip()
+
         try:
-            date_obj = parse_date(exp["date"])
-        except ValueError:
-            # Skip bad data
-            continue
+            datetime.strptime(date, "%Y-%m-%d")
+            amount = float(amount)
+        except:
+            messagebox.showerror("Error", "Invalid date or amount")
+            return
 
-        if date_obj.year == year and date_obj.month == month:
-            monthly.append(exp)
-    return monthly
+        if not category or not desc:
+            messagebox.showerror("Error", "All fields are required")
+            return
 
+        add_expense(date, category, desc, amount)
+        self.load_expenses()
 
-def monthly_report():
-    """
-    Show monthly summary:
-    - list of expenses
-    - total per category
-    - grand total
-    Optionally export to CSV.
-    """
-    print("\n--- Monthly Report ---")
-    # Get year and month from user
-    while True:
-        year_str = input("Enter year (YYYY): ").strip()
-        if year_str.isdigit() and len(year_str) == 4:
-            year = int(year_str)
-            break
-        print("Invalid year. Example: 2025")
+        self.date_entry.delete(0, tk.END)
+        self.category_entry.delete(0, tk.END)
+        self.desc_entry.delete(0, tk.END)
+        self.amount_entry.delete(0, tk.END)
 
-    while True:
-        month_str = input("Enter month (1-12): ").strip()
-        if month_str.isdigit():
-            month = int(month_str)
-            if 1 <= month <= 12:
-                break
-        print("Invalid month. Enter a number between 1 and 12.")
+    # ---------- Monthly Report ----------
+    def monthly_report(self):
+        expenses = read_expenses()
+        if not expenses:
+            messagebox.showinfo("Info", "No expenses found")
+            return
 
-    expenses = get_monthly_expenses(year, month)
+        month = tk.simpledialog.askinteger("Month", "Enter month (1-12):")
+        year = tk.simpledialog.askinteger("Year", "Enter year:")
 
-    if not expenses:
-        print(f"No expenses found for {year}-{month:02d}.")
-        return
+        if not month or not year:
+            return
 
-    print(f"\nExpenses for {year}-{month:02d}:")
-    category_totals = {}
-    grand_total = 0.0
+        category_totals = {}
+        total = 0
 
-    for idx, exp in enumerate(expenses, start=1):
-        try:
-            amount = float(exp["amount"])
-        except ValueError:
-            amount = 0.0
-        grand_total += amount
+        for exp in expenses:
+            y, m, _ = exp["date"].split("-")
+            if int(y) == year and int(m) == month:
+                amt = float(exp["amount"])
+                total += amt
+                category_totals[exp["category"]] = category_totals.get(exp["category"], 0) + amt
 
-        cat = exp["category"]
-        category_totals[cat] = category_totals.get(cat, 0.0) + amount
+        if not category_totals:
+            messagebox.showinfo("Info", "No expenses for this month")
+            return
 
-        print(
-            f"{idx}. Date: {exp['date']}, "
-            f"Category: {exp['category']}, "
-            f"Description: {exp['description']}, "
-            f"Amount: ₹{amount:.2f}"
-        )
+        report = f"Monthly Report {year}-{month:02d}\n\n"
+        for cat, amt in category_totals.items():
+            report += f"{cat}: ₹{amt:.2f}\n"
 
-    print("\n--- Category-wise Totals ---")
-    for cat, total in category_totals.items():
-        print(f"{cat}: ₹{total:.2f}")
+        report += f"\nGrand Total: ₹{total:.2f}"
+        messagebox.showinfo("Report", report)
 
-    print(f"\nGrand Total: ₹{grand_total:.2f}")
+    # ---------- Export Monthly ----------
+    def export_monthly_report(self):
+        expenses = read_expenses()
+        if not expenses:
+            messagebox.showinfo("Info", "No expenses found")
+            return
 
-    # Ask if user wants to export
-    choice = input("\nExport this monthly report to CSV? (y/n): ").strip().lower()
-    if choice == "y":
-        export_monthly_report(expenses, year, month)
-    else:
-        print("Report not exported.")
+        month = tk.simpledialog.askinteger("Month", "Enter month (1-12):")
+        year = tk.simpledialog.askinteger("Year", "Enter year:")
 
+        if not month or not year:
+            return
 
-def export_monthly_report(expenses, year, month):
-    """
-    Export given expenses list to a new CSV file named report_YYYY_MM.csv
-    """
-    filename = f"report_{year}_{month:02d}.csv"
-    try:
-        with open(filename, mode="w", newline="", encoding="utf-8") as f:
-            fieldnames = ["date", "category", "description", "amount"]
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
+        filename = f"report_{year}_{month:02d}.csv"
+
+        with open(filename, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["date", "category", "description", "amount"])
+
             for exp in expenses:
-                writer.writerow(exp)
-        print(f"✅ Monthly report exported as {filename}")
-    except IOError:
-        print("❌ Error: Could not write report file.")
+                y, m, _ = exp["date"].split("-")
+                if int(y) == year and int(m) == month:
+                    writer.writerow(exp.values())
 
+        messagebox.showinfo("Exported", f"Report saved as {filename}")
 
-# ------------- Menu / Main Loop ------------- #
-
-def print_menu():
-    print("\n====== Personal Finance Tracker ======")
-    print("1. Add Expense")
-    print("2. View All Expenses")
-    print("3. View Monthly Report")
-    print("4. Exit")
-
-
-def main():
-    ensure_file_exists()
-
-    while True:
-        print_menu()
-        choice = input("Enter your choice (1-4): ").strip()
-
-        if choice == "1":
-            add_expense()
-        elif choice == "2":
-            view_all_expenses()
-        elif choice == "3":
-            monthly_report()
-        elif choice == "4":
-            print("Exiting... Goodbye! 👋")
-            break
-        else:
-            print("Invalid choice. Please select 1-4.")
-
-
+# ---------- Run ----------
 if __name__ == "__main__":
-    main()
+    root = tk.Tk()
+    app = FinanceTrackerApp(root)
+    root.mainloop()
